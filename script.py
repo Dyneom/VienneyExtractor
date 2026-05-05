@@ -1,10 +1,13 @@
-import fitz  # pip install pymupdf
+import fitz
 import re
 import os
+from pathlib import Path
+import time
 
 
-dir_source = "." # A COMPLETER
-dir_sortie = "." # A COMPLETER
+dir_source = "./pdfs" # dossier source
+dir_sortie = "./outputs" # dossier de sortie
+file_suffix = "_extracted" # suffixe à ajouter au nom de fichier
 
 def extract_boxes_to_pdf(
     input_path,
@@ -13,13 +16,12 @@ def extract_boxes_to_pdf(
     page_height=842,  # idem
     margin=40,        # space between boxes and page edges
     spacing=10,       # vertical gap between boxes
-    min_width=100,
     min_height=20,
     ):
     source = fitz.open(input_path)
     output = fitz.open()
     elements = [r'(Proposition \d+.\d+)',r'(Définition \d+.\d+)',r'(Corollaire \d+.\d+)',r'(Théorème \d+.\d+)',r'(Lemme \d+.\d+)',r'Proposition-définition']
-    current_page = None
+    current_page:fitz.Page = None
     cursor_y = margin  # current vertical position on the page
 
     def new_page():
@@ -36,7 +38,6 @@ def extract_boxes_to_pdf(
     temp = fitz.open()
     temp.insert_pdf(source, from_page=0, to_page=0)
     temp_page = temp[0]
-    page_rect = temp_page.rect
 
 
     words = temp_page.get_text("blocks")  # (x0, y0, x1, y1, word, block_no, line_no, word_no)
@@ -75,12 +76,11 @@ def extract_boxes_to_pdf(
         
         
         page = source[page_num]
-        original_cropbox = page.cropbox
         drawings = page.get_drawings()
         found_objects = []
         
         for d in drawings:
-            rect = d["rect"]
+            rect:fitz.Rect = d["rect"]
             if rect.width < 300 or rect.height < min_height:
                 continue
 
@@ -100,12 +100,9 @@ def extract_boxes_to_pdf(
                 temp = fitz.open()
                 temp.insert_pdf(source, from_page=page_num, to_page=page_num)
                 temp_page = temp[0]
-                page_rect = temp_page.rect
                 
                 words = temp_page.get_text("words")  # (x0, y0, x1, y1, word, block_no, line_no, word_no)
                 
-                
-
                 for word in words:
                     word_rect = fitz.Rect(word[:4])       
 
@@ -115,11 +112,6 @@ def extract_boxes_to_pdf(
                 temp_page.apply_redactions()                
                 temp_page.set_cropbox(rect)  # crop to box on the isolated copy
 
-                
-                
-               
-                
-                
                 box_h = rect.height
                 box_w = min(rect.width, page_width - 2 * margin)  # cap 
 
@@ -147,11 +139,9 @@ def extract_boxes_to_pdf(
     source.close()
     output.close()
 
-paths=os.listdir(dir_source)
+paths=[Path(dir_source)/Path(p) for p in os.listdir(dir_source)]
 
 for el in paths:
-    if re.match(r'Chapitre\d+.pdf',el):
-        print(el," [",sep="",end="",flush=True)
-        extract_boxes_to_pdf(f"{dir_source}/{el}", f"{dir_sortie}/{el}")
-        
-        
+    if re.match(r'Chapitre\d+.pdf',el.name):
+        print(el.name," [",sep="",end="",flush=True)
+        extract_boxes_to_pdf(str(el.absolute()), f"{dir_sortie}/{el.stem}{file_suffix}{el.suffix}")
