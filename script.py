@@ -2,7 +2,6 @@ import fitz
 import re
 import os
 from pathlib import Path
-import time
 
 
 dir_source = "./pdfs" # dossier source
